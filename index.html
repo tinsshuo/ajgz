@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VIP 视频搜索播放工具</title>
+  <style>
+    :root {
+      --primary-color: #006eff;
+      --background: #f8f9fc;
+      --text-color: #2b2b2b;
+      --muted-color: #888;
+      --card-color: #ffffff;
+      --highlight: #f0f4ff;
+      --border-radius: 12px;
+      --shadow: 0 4px 16px rgba(0,0,0,0.08);
+    }
+
+    body {
+      margin: 0;
+      padding: 24px 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+      background: var(--background);
+      color: var(--text-color);
+      text-align: center;
+    }
+
+    h2 {
+      font-size: 24px;
+      color: var(--primary-color);
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin: 18px auto 8px;
+      max-width: 420px;
+      text-align: left;
+      color: #444;
+    }
+
+    input, select, button {
+      width: 92%;
+      max-width: 420px;
+      padding: 14px;
+      margin: 8px auto;
+      font-size: 16px;
+      border-radius: var(--border-radius);
+      border: 1px solid #ddd;
+      box-shadow: var(--shadow);
+      display: block;
+      box-sizing: border-box;
+    }
+
+    button {
+      background: var(--primary-color);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #0057cc;
+    }
+
+    iframe {
+      width: 100%;
+      height: 240px;
+      border: none;
+      margin-top: 20px;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+    }
+
+    /* 教程弹窗 */
+    .tutorial-popup {
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      background: var(--card-color);
+      color: var(--text-color);
+      padding: 18px;
+      width: 280px;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+      font-size: 15px;
+      z-index: 9999;
+      text-align: left;
+      display: none;
+    }
+
+    .tutorial-popup h3 {
+      margin-top: 0;
+      font-size: 18px;
+      margin-bottom: 10px;
+      color: var(--primary-color);
+    }
+
+    .tutorial-popup button {
+      background: #eee;
+      color: #333;
+      font-size: 14px;
+      padding: 6px 12px;
+      width: auto;
+      margin-top: 12px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .tutorial-popup button:hover {
+      background: #ddd;
+    }
+
+    /* 可拖动教程按钮 */
+    .floating-tutorial-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: var(--primary-color);
+      color: #fff;
+      border: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      font-size: 16px;
+      font-weight: bold;
+      z-index: 9998;
+      cursor: grab;
+      user-select: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <h2>VIP 视频搜索播放工具</h2>
+
+  <input type="text" id="videoName" placeholder="请输入您想观看的视频名称，例如：海绵宝宝"/>
+
+  <label for="platform">📺 请选择您要搜索视频的平台：</label>
+  <select id="platform">
+    <option value="https://v.qq.com/x/search/?q=">腾讯视频</option>
+    <option value="https://so.iqiyi.com/so/q_">爱奇艺</option>
+    <option value="https://so.youku.com/search_video/q_">优酷</option>
+  </select>
+
+  <button onclick="openSearch()">🔍 前往平台搜索视频链接</button>
+
+  <label for="videoUrl">🔗 请粘贴视频播放链接（可长按平台内视频获取链接）：</label>
+  <input type="text" id="videoUrl" placeholder="在此粘贴您复制的播放链接"/>
+  <button onclick="autoPasteFromClipboard()">📋 一键粘贴并播放</button>
+
+  <label for="parser">🎯 请选择用于播放的解析接口：</label>
+  <select id="parser">
+    <option value="https://jx.xmflv.cc/?url=">解析接口1</option>
+    <option value="https://www.ckplayer.vip/jiexi/?url=">解析接口2</option>
+  </select>
+
+  <button onclick="play()">▶️ 开始播放</button>
+
+  <iframe id="player" allowfullscreen></iframe>
+
+  <!-- 教程弹窗 -->
+  <div id="tutorial" class="tutorial-popup">
+    <h3>使用教程</h3>
+    <ol>
+      <li>输入视频名称并选择平台</li>
+      <li>跳转后，复制视频播放链接</li>
+      <li>回到本页，点击“一键粘贴并播放”</li>
+    </ol>
+    <button onclick="closeTutorial()">我知道了</button>
+  </div>
+
+  <!-- 可拖动教程按钮 -->
+  <button class="floating-tutorial-btn" id="dragBtn" onclick="showTutorial()">教程</button>
+
+  <script>
+    function openSearch() {
+      const name = document.getElementById("videoName").value.trim();
+      const platform = document.getElementById("platform").value;
+      if (!name) {
+        alert("请输入视频名称");
+        return;
+      }
+      const query = encodeURIComponent(name);
+      window.open(platform + query, '_blank');
+    }
+
+    async function autoPasteFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text.includes("http")) {
+          document.getElementById("videoUrl").value = text;
+          play();
+        } else {
+          alert("剪贴板中未检测到有效链接");
+        }
+      } catch (err) {
+        alert("无法访问剪贴板，请手动粘贴链接");
+      }
+    }
+
+    function play() {
+      const url = document.getElementById("videoUrl").value.trim();
+      const parser = document.getElementById("parser").value;
+      if (!url.startsWith("http")) {
+        alert("请输入有效的视频链接");
+        return;
+      }
+      document.getElementById("player").src = parser + encodeURIComponent(url);
+    }
+
+    function showTutorial() {
+      document.getElementById("tutorial").style.display = 'block';
+    }
+
+    function closeTutorial() {
+      document.getElementById("tutorial").style.display = 'none';
+    }
+
+    // 拖动功能（兼容鼠标和触摸）
+    const btn = document.getElementById("dragBtn");
+    let offsetX, offsetY, dragging = false;
+
+    btn.addEventListener("mousedown", (e) => {
+      dragging = true;
+      offsetX = e.clientX - btn.getBoundingClientRect().left;
+      offsetY = e.clientY - btn.getBoundingClientRect().top;
+      btn.style.cursor = "grabbing";
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (dragging) {
+        btn.style.left = `${e.clientX - offsetX}px`;
+        btn.style.top = `${e.clientY - offsetY}px`;
+        btn.style.right = "auto";
+        btn.style.bottom = "auto";
+      }
+    });
+
+    document.addEventListener("mouseup", () => {
+      dragging = false;
+      btn.style.cursor = "grab";
+    });
+
+    // 移动端触摸拖动支持
+    btn.addEventListener("touchstart", (e) => {
+      dragging = true;
+      const touch = e.touches[0];
+      offsetX = touch.clientX - btn.getBoundingClientRect().left;
+      offsetY = touch.clientY - btn.getBoundingClientRect().top;
+    });
+
+    document.addEventListener("touchmove", (e) => {
+      if (dragging) {
+        const touch = e.touches[0];
+        btn.style.left = `${touch.clientX - offsetX}px`;
+        btn.style.top = `${touch.clientY - offsetY}px`;
+        btn.style.right = "auto";
+        btn.style.bottom = "auto";
+      }
+    });
+
+    document.addEventListener("touchend", () => {
+      dragging = false;
+    });
+  </script>
+</body>
+</html>
